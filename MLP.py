@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 
 torch.manual_seed(2000)
 
-batch_size = 30
+batch_size = 20 # 20, 16
 image_folders = os.listdir("Dataset/Images")
 device = "cuda" if torch.cuda.is_available else "cpu"
 print(f"Device: {device}")
@@ -104,50 +104,97 @@ def generate_batch(batch_size, split):
     # Pixel matrices, Labels
     return rice_image_matrices.to(device = device), rice_types.to(device = device)
         
+@torch.no_grad()
+def split_loss(split):
+    
+    X, Y = generate_batch(batch_size = batch_size, split = split)
 
-# Shape = (batch_size, number of pixels in each image, 1) (batch_size of 62500 pixels which contain a greyscale value)
-# Xtr, Ytr = generate_batch(batch_size = batch_size, split = "Train")
-# Xte, Yte = generate_batch(batch_size = batch_size, split = "Test")
+    # Forward pass
+    logits = model(X) # (batch_size, 5)
 
-# print(Xtr.shape, Ytr.shape)
-# print(Xte.shape, Yte.shape)
+    # Cross-entropy loss
+    loss = F.cross_entropy(logits, Y)
 
+    print(f"{split}Loss: {loss.item()}")
+
+@torch.no_grad()
+def evaluate_loss(num_iterations):
+    
+    model.eval()
+
+    # Holds the losses for the train split and test split (with no change in model parameters)
+    split_losses = {}
+
+    for split in ("Train", "Test"):
+
+        losses = torch.zeros(num_iterations, device = device)
+        accuracies = torch.zeros(num_iterations, device = device)
+
+        for x in range(num_iterations):
+            Xev, Yev = generate_batch(batch_size = batch_size, split = split)
+
+            # Forward pass
+            logits = model(Xev)
+            # Cross-Entropy loss
+            loss = F.cross_entropy(logits, Yev)
+            # Set loss
+            losses[x] = loss.item()
+
+            # Test accuracy
+            if split == "Test":
+                # Find the accuracy on the predictions on this batch
+                accuracies[x] = (count_correct_preds(predictions = logits, targets = Yev).item() / batch_size) * 100 # Returns tensor containing the number of correct predictions
+                # print(f"Accuracy on batch: {accuracies[x]}")
+
+        split_losses[split] = losses.mean()
+        avg_test_accuracy = accuracies.mean()
+    
+    model.train() 
+
+    return split_losses, avg_test_accuracy
+
+def count_correct_preds(predictions, targets):
+    # Find the predictions of the model
+    _, output = torch.max(predictions, dim = 1) 
+    output = F.one_hot(output, num_classes = 5) # 5 types of rice
+
+    # Return the number of correct predictions
+    return torch.sum((output == targets).all(axis = 1))
 
 # No.of inputs = Number of pixels in image 
-
 model = nn.Sequential(
-                        nn.Linear(10000, 5000),
-                        nn.BatchNorm1d(num_features = 5000),
-                        nn.ReLU(),
 
-                        nn.Linear(5000, 2500),
-                        nn.BatchNorm1d(num_features = 2500),
-                        nn.ReLU(),
+                    # # 1
+                    # nn.Linear(10000, 5000),
+                    # nn.BatchNorm1d(num_features = 5000),
+                    # nn.ReLU(),
 
-                        nn.Linear(2500, 1250),
-                        nn.BatchNorm1d(num_features = 1250),
-                        nn.ReLU(),
+                    # nn.Linear(5000, 2500),
+                    # nn.BatchNorm1d(num_features = 2500),
+                    # nn.ReLU(),
 
-                        nn.Linear(1250, 625),
-                        nn.BatchNorm1d(num_features = 625),
-                        nn.ReLU(),
+                    # nn.Linear(2500, 5),
 
-                        nn.Linear(625, 5),
+                    # 2
+                    nn.Linear(10000, 2500),
+                    nn.BatchNorm1d(num_features = 2500),
+                    nn.ReLU(),
 
-                        # nn.Linear(5000, 5)
-                        )
+                    nn.Linear(2500, 5)
+                    )
 model.to(device = device)
 
 # Optimisers
 # optimiser = torch.optim.SGD(model.parameters(), lr = 0.1) # Stochastic gradient descent
-optimiser = torch.optim.AdamW(model.parameters(), lr = 1e-5) # Adam (updates learning rate for each weight individually)
+optimiser = torch.optim.AdamW(model.parameters(), lr = 1e-3) # Adam (updates learning rate for each weight individually)
 
 Xtr, Ytr = generate_batch(batch_size = batch_size, split = "Train")
 print(Xtr.shape)
 
 losses_i = []
+accuracies = []
 
-for i in range(1000):
+for i in range(4000):
     
     # Generate batch of images
     Xtr, Ytr = generate_batch(batch_size = batch_size, split = "Train")
@@ -172,24 +219,17 @@ for i in range(1000):
     losses_i.append(loss.log10().item()) # log10 for better visualisation
 
     if i % 50 == 0:
-        print(f"Epoch: {i} | Loss: {loss.item()}")
+        split_losses, test_acc = evaluate_loss(num_iterations = 20)
+        print(f"Epoch: {i} | TrainLoss: {split_losses['Train']:.4f} | TestLoss: {split_losses['Test']:.4f} | AverageTestAccuracy: {test_acc}%")
+        accuracies.append(test_acc)
 
 
 losses_i = torch.tensor(losses_i).view(-1, 100).mean(1) 
 plt.plot(losses_i)
 plt.show()
 
-@torch.no_grad()
-def split_loss():
-    
-    Xte, Yte = generate_batch(batch_size = batch_size, split = "Test")
-
-    # Forward pass
-    logits = model(Xte) # (batch_size, 5)
-
-    # Cross-entropy loss
-    loss = F.cross_entropy(logits, Yte)
-
-    print(f"TestLoss: {loss.item()}")
-
-split_loss()
+# Evaluate model
+model.eval()
+split_loss("Train")
+split_loss("Test")
+print(f"AvgTestAccuracy: {sum(accuracies) / len(accuracies)}")
