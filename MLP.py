@@ -164,25 +164,38 @@ def count_correct_preds(predictions, targets):
 # No.of inputs = Number of pixels in image 
 model = nn.Sequential(
 
-                    # # 1
-                    # nn.Linear(10000, 5000),
-                    # nn.BatchNorm1d(num_features = 5000),
-                    # nn.ReLU(),
+                    # 1
+                    nn.Linear(10000, 5000),
+                    nn.BatchNorm1d(num_features = 5000),
+                    nn.ReLU(),
 
-                    # nn.Linear(5000, 2500),
-                    # nn.BatchNorm1d(num_features = 2500),
-                    # nn.ReLU(),
-
-                    # nn.Linear(2500, 5),
-
-                    # 2
-                    nn.Linear(10000, 2500),
+                    nn.Linear(5000, 2500),
                     nn.BatchNorm1d(num_features = 2500),
                     nn.ReLU(),
 
-                    nn.Linear(2500, 5)
+                    nn.Linear(2500, 5),
+
+                    # # 2
+                    # nn.Linear(10000, 2500),
+                    # nn.BatchNorm1d(num_features = 2500),
+                    # nn.ReLU(),
+
+                    # nn.Linear(2500, 5)
                     )
 model.to(device = device)
+
+# Kai-ming initialisation
+for layer in model:
+    if isinstance(layer, nn.Linear):
+        torch.nn.init.kaiming_normal_(layer.weight, mode = "fan_in", nonlinearity = "relu")
+        # print(layer.weight.std(), layer.weight.mean())
+
+        # 2nd method:
+        # fan_in = layer.weight.size(1)
+        # std = torch.sqrt(torch.tensor(2.0 / fan_in))
+        # nn.init.normal(layer.weight, mean = 0, std = std)
+        # print(layer.weight.std(), layer.weight.mean())
+
 
 # Optimisers
 # optimiser = torch.optim.SGD(model.parameters(), lr = 0.1) # Stochastic gradient descent
@@ -194,7 +207,7 @@ print(Xtr.shape)
 losses_i = []
 accuracies = []
 
-for i in range(4000):
+for i in range(20000):
     
     # Generate batch of images
     Xtr, Ytr = generate_batch(batch_size = batch_size, split = "Train")
@@ -233,3 +246,46 @@ model.eval()
 split_loss("Train")
 split_loss("Test")
 print(f"AvgTestAccuracy: {sum(accuracies) / len(accuracies)}")
+
+# Tests:
+
+# 2nd set-up for model:
+
+# (20 batch size)
+
+# 4000 steps:
+# TrainLoss: 0.0044874693267047405
+# TestLoss: 1.4345823526382446
+# AvgTestAccuracy: 83.10625457763672
+
+
+# 8000 steps:
+# TrainLoss: 0.13627372682094574
+# TestLoss: 0.5875635743141174
+# AvgTestAccuracy: 84.59844207763672
+
+
+# 15000 steps:
+# TrainLoss: 0.011814704164862633
+# TestLoss: 1.6575645208358765
+# AvgTestAccuracy: 85.5250015258789
+
+# 20000 steps:
+# TrainLoss: 0.016652490943670273
+# TestLoss: 0.6712936758995056
+# AvgTestAccuracy: 85.96812438964844
+
+
+# 1st set-up for model:
+
+# (20 batch size)
+
+# 20000 steps
+# TrainLoss: 0.00813382025808096
+# TestLoss: 0.6734930276870728
+# AvgTestAccuracy: 86.33562469482422
+
+# 20000 steps + Kai-Ming initialised
+# TrainLoss: 0.24427886307239532
+# TestLoss: 0.1805109679698944
+# AvgTestAccuracy: 86.43186950683594
