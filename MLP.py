@@ -7,10 +7,12 @@ import matplotlib.pyplot as plt
 
 torch.manual_seed(2000)
 
-batch_size = 20 # 20, 16
+batch_size = 50 # 20, 16
 image_folders = os.listdir("Dataset/Images")
 device = "cuda" if torch.cuda.is_available else "cpu"
 print(f"Device: {device}")
+image_size = (125, 125)
+num_image_pixels = image_size[0] * image_size[1]
 
 # Splits and distributions for generating batches
 num_types = len(image_folders)
@@ -32,7 +34,7 @@ print(uniform_types_distribution.dtype)
 print(uniform_types_distribution)
 print(uniform_train_images_distribution)
 
-def img_to_matrix(image_indexes, r_type_indexes):
+def img_to_matrix(image_indexes, r_type_indexes, img_size, img_num_pixels):
 
     # Creates all pixel matrixes in a batch
 
@@ -53,13 +55,13 @@ def img_to_matrix(image_indexes, r_type_indexes):
         img = cv2.imread(img_path)
 
         # Scale down image
-        img = cv2.resize(img, (100, 100))
+        img = cv2.resize(img, img_size)
 
         # Convert image to grey
         grey_img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
         # Matrix of shape (62500) with each pixel containing the greyscale value
-        pixel_matrix = torch.from_numpy(grey_img).view(100 * 100).float()
+        pixel_matrix = torch.from_numpy(grey_img).view(img_num_pixels).float()
         
         # Add to matrices list
         matrices.append(pixel_matrix)
@@ -99,7 +101,7 @@ def generate_batch(batch_size, split):
         rice_image_indexes += 1 # The indexes only go from 0 - 14999 but the numbers at the end of each image go from 1 - 15000
     
     # Convert indexes to matrices
-    rice_image_matrices = img_to_matrix(image_indexes = rice_image_indexes, r_type_indexes = rice_type_indexes)
+    rice_image_matrices = img_to_matrix(image_indexes = rice_image_indexes, r_type_indexes = rice_type_indexes, img_size = image_size, img_num_pixels = num_image_pixels)
 
     # Pixel matrices, Labels
     return rice_image_matrices.to(device = device), rice_types.to(device = device)
@@ -164,16 +166,16 @@ def count_correct_preds(predictions, targets):
 # No.of inputs = Number of pixels in image 
 model = nn.Sequential(
 
-                    # 1
-                    nn.Linear(10000, 5000),
-                    nn.BatchNorm1d(num_features = 5000),
-                    nn.ReLU(),
+                    # # 1
+                    # nn.Linear(10000, 5000),
+                    # nn.BatchNorm1d(num_features = 5000),
+                    # nn.ReLU(),
 
-                    nn.Linear(5000, 2500),
-                    nn.BatchNorm1d(num_features = 2500),
-                    nn.ReLU(),
+                    # nn.Linear(5000, 2500),
+                    # nn.BatchNorm1d(num_features = 2500),
+                    # nn.ReLU(),
 
-                    nn.Linear(2500, 5),
+                    # nn.Linear(2500, 5),
 
                     # # 2
                     # nn.Linear(10000, 2500),
@@ -181,6 +183,57 @@ model = nn.Sequential(
                     # nn.ReLU(),
 
                     # nn.Linear(2500, 5)
+
+                    # # 3
+                    # nn.Linear(10000, 7500),
+                    # nn.BatchNorm1d(num_features = 7500),
+                    # nn.ReLU(),
+
+                    # nn.Linear(7500, 5000),
+                    # nn.BatchNorm1d(num_features = 5000),
+                    # nn.ReLU(),
+
+                    # nn.Linear(5000, 2500),
+                    # nn.BatchNorm1d(num_features = 2500),
+                    # nn.ReLU(),
+
+                    # nn.Linear(2500, 1250),
+                    # nn.BatchNorm1d(num_features = 1250),
+                    # nn.ReLU(),
+
+                    # nn.Linear(1250, 625),
+                    # nn.BatchNorm1d(num_features = 625),
+                    # nn.ReLU(),
+
+                    # nn.Linear(625, 5)
+
+                    # 4 (125 x 125) image size
+                    nn.Linear(num_image_pixels, 10000),
+                    nn.BatchNorm1d(num_features = 10000),
+                    nn.ReLU(),
+
+                    nn.Linear(10000, 7500),
+                    nn.BatchNorm1d(num_features = 7500),
+                    nn.ReLU(),
+
+                    nn.Linear(7500, 5000),
+                    nn.BatchNorm1d(num_features = 5000),
+                    nn.ReLU(),
+
+                    nn.Linear(5000, 2500),
+                    nn.BatchNorm1d(num_features = 2500),
+                    nn.ReLU(),
+
+                    nn.Linear(2500, 1250),
+                    nn.BatchNorm1d(num_features = 1250),
+                    nn.ReLU(),
+
+                    nn.Linear(1250, 625),
+                    nn.BatchNorm1d(num_features = 625),
+                    nn.ReLU(),
+
+                    nn.Linear(625, 5)
+
                     )
 model.to(device = device)
 
@@ -289,3 +342,34 @@ print(f"AvgTestAccuracy: {sum(accuracies) / len(accuracies)}")
 # TrainLoss: 0.24427886307239532
 # TestLoss: 0.1805109679698944
 # AvgTestAccuracy: 86.43186950683594
+
+# (50 batch size)
+# 20000 steps + Kai-Ming initialised
+# TrainLoss: 0.02025546319782734
+# TestLoss: 0.09186305105686188
+# AvgTestAccuracy: 87.64724731445312
+
+
+# 3rd set-up for model:
+
+# (20 batch size)
+# 20000 steps + Kai-Ming initialised
+# TrainLoss: 0.0906727984547615
+# TestLoss: 0.12910525500774384
+# AvgTestAccuracy: 86.1875
+
+
+# (50 batch size)
+# 20000 steps + Kai-Ming initialised
+# TrainLoss: 0.019007110968232155
+# TestLoss: 0.35505980253219604
+# AvgTestAccuracy: 88.05570983886719
+
+
+# 4th set-up for model: [(125 x 125) image size (was set to (100, 100) for the other tests)]
+
+# (50 batch size)
+# 20000 steps + Kai-Ming initialised
+# TrainLoss: 0.0330025739967823
+# TestLoss: 0.2380436509847641
+# AvgTestAccuracy: 88.164794921875
