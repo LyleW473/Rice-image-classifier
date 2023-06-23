@@ -298,7 +298,7 @@ plt.show()
 model.eval()
 split_loss("Train")
 split_loss("Test")
-print(f"AvgTestAccuracy: {sum(accuracies) / len(accuracies)}")
+print(f"AvgTestAccuracy: {sum(accuracies) / len(accuracies)}") # Average test accuracy overall when the model was training
 
 # Tests:
 
@@ -373,3 +373,28 @@ print(f"AvgTestAccuracy: {sum(accuracies) / len(accuracies)}")
 # TrainLoss: 0.0330025739967823
 # TestLoss: 0.2380436509847641
 # AvgTestAccuracy: 88.164794921875
+
+test_losses_i = []
+num_correct = 0
+test_steps = 300
+test_batch_size = 50
+# 15000 total test images if test_split_multiplier == 0.2
+with torch.no_grad():
+    
+    for i in range(test_steps): # Test 300 * 50 images in the test split
+        Xte, Yte = generate_batch(batch_size = test_batch_size, split = "Test")
+
+        logits = model(Xte)
+        loss = F.cross_entropy(logits, Yte)
+
+        num_correct += count_correct_preds(predictions = logits, targets = Yte)
+        test_losses_i.append(loss.log10().item())
+
+        if i % 50 == 0 and i != 0:
+            print(f"Correct predictions: {num_correct} / {i * test_batch_size} | Accuracy(%): {(num_correct / (i * test_batch_size)) * 100}")
+
+print(f"Correct predictions: {num_correct} / {test_steps * test_batch_size} | Accuracy(%): {(num_correct / (test_steps * test_batch_size)) * 100}")
+
+test_losses_i = torch.tensor(test_losses_i).view(-1, 100).mean(1) 
+plt.plot(test_losses_i)
+plt.show()
