@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 
 torch.manual_seed(2000)
 
-batch_size = 32
+batch_size = 50
 image_folders = os.listdir("Dataset/Images")
 device = "cuda" if torch.cuda.is_available else "cpu"
 print(f"Device: {device}")
@@ -226,12 +226,14 @@ model = nn.Sequential(
 
                     nn.Flatten(),
 
-                    nn.Linear(32 * 25 * 25, 128),
+                    # Note: To find out the in_features, comment out everything after the nn.Flatten() and find the shape of the output of nn.MaxPool2d
+                    # The last 3 numbers of the shape should be the in_features for the first linear layer
+                    nn.Linear(32 * 25 * 25, 128), 
                     nn.ReLU(),
                     nn.Linear(128, 5) # 5 types of rice
-
-                    )
                     
+                    )
+
 model.to(device = device)
 
 # Kai-ming initialisation
@@ -249,7 +251,7 @@ for layer in model:
 
 # Optimisers
 # optimiser = torch.optim.SGD(model.parameters(), lr = 0.1) # Stochastic gradient descent
-optimiser = torch.optim.AdamW(model.parameters(), lr = 1e-3) # Adam (updates learning rate for each weight individually)
+optimiser = torch.optim.AdamW(model.parameters(), lr = 0.0005) # Adam (updates learning rate for each weight individually)
 
 Xtr, Ytr = generate_batch(batch_size = batch_size, split = "Train")
 print(Xtr.shape)
@@ -316,7 +318,37 @@ with torch.no_grad():
         if i % 50 == 0 and i != 0:
             print(f"Correct predictions: {num_correct} / {i * test_batch_size} | Accuracy(%): {(num_correct / (i * test_batch_size)) * 100}")
 
+print(f"Correct predictions: {num_correct} / {test_steps * test_batch_size} | Accuracy(%): {(num_correct / (test_steps * test_batch_size)) * 100}")
 test_losses_i = torch.tensor(test_losses_i).view(-1, 100).mean(1) 
 plt.plot(test_losses_i)
 plt.show()
-print(f"Correct predictions: {num_correct} / {test_steps * test_batch_size} | Accuracy(%): {(num_correct / (test_steps * test_batch_size)) * 100}")
+
+
+# Set-up 2: (Updated learning rate from 1e-3 to 5e-4 as the model was learning too fast)
+
+# ----------------------------------
+# (20 batch-size)
+# 20000 steps + Kai-Ming initialised
+
+# TrainLoss: 0.000959714874625206
+# TestLoss: 1.0196211338043213
+# AvgTestAccuracy: 88.28624725341797
+# Correct predictions: 13586 / 15000 | Accuracy(%): 90.57333374023438
+
+# ----------------------------------
+# (32 batch-size)
+# 20000 steps + Kai-Ming initialised
+
+# TrainLoss: 0.0013303746236488223
+# TestLoss: 1.2726616859436035
+# AvgTestAccuracy: 88.8050765991211
+# Correct predictions: 13754 / 15000 | Accuracy(%): 91.6933364868164
+
+# ----------------------------------
+# (50 batch-size)
+# 20000 steps + Kai-Ming initialised
+
+# TrainLoss: 0.0004085874534212053
+# TestLoss: 1.0551307201385498
+# AvgTestAccuracy: 89.63224029541016
+# Correct predictions: 13620 / 15000 | Accuracy(%): 90.80000305175781
