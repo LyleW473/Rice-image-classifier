@@ -19,20 +19,24 @@ num_types = len(image_folders)
 uniform_types_distribution = torch.ones(num_types, dtype = torch.float32, device = device) / num_types # 5 types of rice
 
 # 5 types of rice, 15000 images for each = 75000 total
-# 75000 * 0.2 = 15000 images in total for test/validation split
-# 15000 / 5 = 3000 images of each type for test/validation split
-test_split_multiplier = 0.2
+# 75000 * 0.1 = 7500 images in total for test/validation split
+# 7500 / 5 = 1500 images of each type for test/validation split
+test_split_multiplier = 0.1
+val_split_multiplier = 0.1
+
 num_test_imgs = int((75000 * test_split_multiplier) / 5)
-num_train_imgs = int(15000 - num_test_imgs)
-print(num_test_imgs, num_train_imgs)
+num_val_imgs = int((75000 * val_split_multiplier) / 5)
+num_train_imgs = int(15000 - num_test_imgs - num_val_imgs)
+print(num_train_imgs, num_val_imgs, num_test_imgs)
 
 uniform_train_images_distribution = torch.ones(num_train_imgs, dtype = torch.float32, device = device) / num_train_imgs # 15000 images for each type of rice
 uniform_test_images_distribution = torch.ones(num_test_imgs, dtype = torch.float32, device = device) / num_test_imgs
+uniform_val_images_distribution = torch.ones(num_val_imgs, dtype = torch.float32, device = device) / num_val_imgs
 
-print(uniform_train_images_distribution.dtype)
-print(uniform_types_distribution.dtype)
-print(uniform_types_distribution)
-print(uniform_train_images_distribution)
+# print(uniform_train_images_distribution.dtype)
+# print(uniform_types_distribution.dtype)
+# print(uniform_types_distribution)
+# print(uniform_train_images_distribution)
 
 def img_to_matrix(image_indexes, r_type_indexes, img_size):
 
@@ -83,21 +87,28 @@ def generate_batch(batch_size, split):
     
     # -------------------------------
 
-    # Test split images
-    if split == "Test":
-        # Note: uniform_test_images_distribution will have a smaller range of index values 
-        # - (e.g. if num_test_imgs = 15000, as there are 5 types, the last 15000 / 3000 images are for the test/validation split)
-        # - i.e. Only images at index 12000 -> 15000 will be used for the test, whereas the 0 -> 12000 will be used for the train split
-        rice_image_indexes = torch.multinomial(input = uniform_test_images_distribution, num_samples = batch_size, replacement = True)
-        rice_image_indexes += (15000 - num_test_imgs) + 1 # The indexes only go from 0 - 14999 but the numbers at the end of each image go from 1 - 15000
-
-    
     # Train split images
-    else:
+    if split == "Train":
         # Generate indexes for rice images
         rice_image_indexes = torch.multinomial(input = uniform_train_images_distribution, num_samples = batch_size, replacement = True)
         rice_image_indexes += 1 # The indexes only go from 0 - 14999 but the numbers at the end of each image go from 1 - 15000
     
+    # Val split images
+    elif split == "Val":
+        # Generate indexes for rice images
+        rice_image_indexes = torch.multinomial(input = uniform_val_images_distribution, num_samples = batch_size, replacement = True)
+        # Note: If val_split_multiplier = 0.1: 15000 - 1500 - 1500 + 1 = 12001 
+        # i.e. images at indexes 12001 - 13500 for each rice type are for the val split
+        rice_image_indexes += (15000 - num_test_imgs - num_val_imgs) + 1 # The indexes only go from 0 - 14999 but the numbers at the end of each image go from 1 - 15000
+    
+    # Test split images
+    else:
+        # Note: uniform_test_images_distribution will have a smaller range of index values 
+        # - (e.g. if num_test_imgs = 7500, as there are 5 types, the last (7500 / 5) = 1500 images of this type are for the test split)
+        # - i.e. Only images at indexes 13501 - 15000 will be used for the test split
+        rice_image_indexes = torch.multinomial(input = uniform_test_images_distribution, num_samples = batch_size, replacement = True)
+        rice_image_indexes += (15000 - num_test_imgs) + 1 # The indexes only go from 0 - 14999 but the numbers at the end of each image go from 1 - 15000
+
     # Convert indexes to matrices
     rice_image_matrices = img_to_matrix(image_indexes = rice_image_indexes, r_type_indexes = rice_type_indexes, img_size = image_size)
 
@@ -122,10 +133,10 @@ def evaluate_loss(num_iterations):
     
     model.eval()
 
-    # Holds the losses for the train split and test split (with no change in model parameters)
+    # Holds the losses for the train split and val split (with no change in model parameters)
     split_losses = {}
 
-    for split in ("Train", "Test"):
+    for split in ("Train", "Val"):
 
         losses = torch.zeros(num_iterations, device = device)
         accuracies = torch.zeros(num_iterations, device = device)
@@ -140,18 +151,18 @@ def evaluate_loss(num_iterations):
             # Set loss
             losses[x] = loss.item()
 
-            # Test accuracy
-            if split == "Test":
+            # Val accuracy
+            if split == "Val":
                 # Find the accuracy on the predictions on this batch
-                accuracies[x] = (count_correct_preds(predictions = logits, targets = Yev).item() / batch_size) * 100 # Returns tensor containing the number of correct predictions
+                accuracies[x] = (count_correct_preds(predictions = logits, targets = Yev) / batch_size) * 100 # Returns tensor containing the number of correct predictions
                 # print(f"Accuracy on batch: {accuracies[x]}")
 
         split_losses[split] = losses.mean()
-        avg_test_accuracy = accuracies.mean()
+        avg_val_accuracy = accuracies.mean()
     
     model.train() 
 
-    return split_losses, avg_test_accuracy
+    return split_losses, avg_val_accuracy
 
 def count_correct_preds(predictions, targets):
     # Find the predictions of the model
@@ -159,7 +170,7 @@ def count_correct_preds(predictions, targets):
     output = F.one_hot(output, num_classes = 5) # 5 types of rice
 
     # Return the number of correct predictions
-    return torch.sum((output == targets).all(axis = 1))
+    return torch.sum((output == targets).all(axis = 1)).item()
         
 # No.of inputs = Number of pixels in image 
 model = nn.Sequential(
@@ -231,7 +242,7 @@ model = nn.Sequential(
                     nn.Linear(32 * 25 * 25, 128), 
                     nn.ReLU(),
                     nn.Linear(128, 5) # 5 types of rice
-                    
+
                     )
 
 model.to(device = device)
@@ -284,9 +295,9 @@ for i in range(20000):
     losses_i.append(loss.log10().item()) # log10 for better visualisation
 
     if i % 50 == 0:
-        split_losses, test_acc = evaluate_loss(num_iterations = 20)
-        print(f"Epoch: {i} | TrainLoss: {split_losses['Train']:.4f} | TestLoss: {split_losses['Test']:.4f} | AverageTestAccuracy: {test_acc}%")
-        accuracies.append(test_acc)
+        split_losses, val_acc = evaluate_loss(num_iterations = 20)
+        print(f"Epoch: {i} | TrainLoss: {split_losses['Train']:.4f} | ValLoss: {split_losses['Val']:.4f} | AverageValAccuracy: {val_acc}%")
+        accuracies.append(val_acc)
 
 
 losses_i = torch.tensor(losses_i).view(-1, 100).mean(1) 
@@ -296,29 +307,30 @@ plt.show()
 # Evaluate model
 model.eval()
 split_loss("Train")
+split_loss("Val")
 split_loss("Test")
-print(f"AvgTestAccuracy: {sum(accuracies) / len(accuracies)}") # Average test accuracy overall when the model was training
+print(f"AvgValAccuracy: {sum(accuracies) / len(accuracies)}") # Average validation accuracy overall whilst the model was training
 
 test_losses_i = []
 num_correct = 0
+num_tested = 0
 test_steps = 500
 test_batch_size = 30
-# 15000 total test images if test_split_multiplier == 0.2
 with torch.no_grad():
     
-    for i in range(test_steps): # Test 500 * 30 images in the test split
+    for i in range(test_steps):
         Xte, Yte = generate_batch(batch_size = test_batch_size, split = "Test")
 
         logits = model(Xte)
         loss = F.cross_entropy(logits, Yte)
 
         num_correct += count_correct_preds(predictions = logits, targets = Yte)
+        num_tested += test_batch_size
         test_losses_i.append(loss.log10().item())
+        
+        if (i + 1) % 50 == 0: # i = 99, this is the 100th iteration
+            print(f"Correct predictions: {num_correct} / {num_tested} | Accuracy(%): {(num_correct / num_tested) * 100}")
 
-        if i % 50 == 0 and i != 0:
-            print(f"Correct predictions: {num_correct} / {i * test_batch_size} | Accuracy(%): {(num_correct / (i * test_batch_size)) * 100}")
-
-print(f"Correct predictions: {num_correct} / {test_steps * test_batch_size} | Accuracy(%): {(num_correct / (test_steps * test_batch_size)) * 100}")
 test_losses_i = torch.tensor(test_losses_i).view(-1, 100).mean(1) 
 plt.plot(test_losses_i)
 plt.show()
@@ -330,25 +342,28 @@ plt.show()
 # (20 batch-size)
 # 20000 steps + Kai-Ming initialised
 
-# TrainLoss: 0.000959714874625206
-# TestLoss: 1.0196211338043213
-# AvgTestAccuracy: 88.28624725341797
-# Correct predictions: 13586 / 15000 | Accuracy(%): 90.57333374023438
+# TrainLoss: 0.000189362617675215
+# ValLoss: 0.9503949284553528
+# TestLoss: 1.014149785041809
+# AvgValAccuracy: 88.78062438964844
+# Correct predictions: 13543 / 15000 | Accuracy(%): 90.28666666666668
 
 # ----------------------------------
 # (32 batch-size)
 # 20000 steps + Kai-Ming initialised
 
-# TrainLoss: 0.0013303746236488223
-# TestLoss: 1.2726616859436035
-# AvgTestAccuracy: 88.8050765991211
-# Correct predictions: 13754 / 15000 | Accuracy(%): 91.6933364868164
+# TrainLoss: 2.039352875726763e-05
+# ValLoss: 1.143798589706421
+# TestLoss: 0.02179698273539543
+# AvgValAccuracy: 89.6832046508789
+# Correct predictions: 13813 / 15000 | Accuracy(%): 92.08666666666666
 
 # ----------------------------------
 # (50 batch-size)
 # 20000 steps + Kai-Ming initialised
 
-# TrainLoss: 0.0004085874534212053
-# TestLoss: 1.0551307201385498
-# AvgTestAccuracy: 89.63224029541016
-# Correct predictions: 13620 / 15000 | Accuracy(%): 90.80000305175781
+# TrainLoss: 0.005304774735122919
+# ValLoss: 1.1827752590179443
+# TestLoss: 0.3905371427536011
+# AvgValAccuracy: 89.80329132080078
+# Correct predictions: 13630 / 15000 | Accuracy(%): 90.86666666666666
