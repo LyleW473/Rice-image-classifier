@@ -271,18 +271,24 @@ model = nn.Sequential(
 
 model.to(device = device)
 
-# Kai-ming initialisation
-for layer in model:
-    if isinstance(layer, nn.Linear):
-        torch.nn.init.kaiming_normal_(layer.weight, mode = "fan_in", nonlinearity = "relu")
-        # print(layer.weight.std(), layer.weight.mean())
+# Initialisation
 
-        # 2nd method:
-        # fan_in = layer.weight.size(1)
-        # std = torch.sqrt(torch.tensor(2.0 / fan_in))
-        # nn.init.normal(layer.weight, mean = 0, std = std)
-        # print(layer.weight.std(), layer.weight.mean())
+with torch.no_grad():
 
+    # Make the last layer less confident at initialisation
+    model[-1].weight *= 0.1
+
+    # Kai-ming initialisation
+    for layer in model:
+        if isinstance(layer, nn.Linear):
+            torch.nn.init.kaiming_normal_(layer.weight, mode = "fan_in", nonlinearity = "relu")
+            # print(layer.weight.std(), layer.weight.mean())
+
+            # 2nd method:
+            # fan_in = layer.weight.size(1)
+            # std = torch.sqrt(torch.tensor(2.0 / fan_in))
+            # nn.init.normal(layer.weight, mean = 0, std = std)
+            # print(layer.weight.std(), layer.weight.mean())
 
 # Optimisers
 # optimiser = torch.optim.SGD(model.parameters(), lr = 0.1) # Stochastic gradient descent
@@ -419,6 +425,13 @@ plt.show()
 # TestLoss: 0.00033487920882180333
 # AvgValAccuracy: 95.13812255859375
 # Correct predictions: 14869 / 15000 | Accuracy(%): 99.12666666666667
+
+# 20000 steps + Kai-Ming initialised + dropout(p = 0.1) + less confident linear layer at initialisation
+# TrainLoss: 0.002749544335529208
+# ValLoss: 9.928843792295083e-05
+# TestLoss: 0.0004932366427965462
+# AvgValAccuracy: 95.1624984741211
+# Correct predictions: 14934 / 15000 | Accuracy(%): 99.56
 
 # ----------------------------------
 # (32 batch-size)
