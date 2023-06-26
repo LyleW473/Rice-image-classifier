@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 
 torch.manual_seed(2000)
 
-batch_size = 50
+batch_size = 32
 image_folders = os.listdir("Dataset/Images")
 device = "cuda" if torch.cuda.is_available else "cpu"
 print(f"Device: {device}")
@@ -226,22 +226,45 @@ model = nn.Sequential(
                     # nn.ReLU(),
                     # nn.Linear(128, 5) # 5 types of rice
 
-                    # 2 
-                    nn.Conv2d(3, 16, kernel_size = 3, stride = 1, padding = 1), 
+                    # # 2 
+                    # nn.Conv2d(3, 16, kernel_size = 3, stride = 1, padding = 1), 
+                    # nn.ReLU(),
+                    # nn.MaxPool2d(kernel_size = 2, stride = 2),
+
+                    # nn.Conv2d(16, 32, kernel_size = 3, stride = 1, padding = 1),
+                    # nn.ReLU(),
+                    # nn.MaxPool2d(kernel_size = 2, stride = 2),
+
+                    # nn.Flatten(),
+
+                    # # Note: To find out the in_features, comment out everything after the nn.Flatten() and find the shape of the output of nn.MaxPool2d
+                    # # The last 3 numbers of the shape should be the in_features for the first linear layer
+                    # nn.Linear(32 * 25 * 25, 128), 
+                    # nn.ReLU(),
+                    # nn.Linear(128, 5) # 5 types of rice
+
+                    # 3
+                    nn.Conv2d(3, 30, kernel_size = 3, stride = 1, padding = 1),
+                    nn.BatchNorm2d(30), # BatchNorm2d applies batch-norm to a 4-D input (batch_size, channels, height, width)
                     nn.ReLU(),
                     nn.MaxPool2d(kernel_size = 2, stride = 2),
 
-                    nn.Conv2d(16, 32, kernel_size = 3, stride = 1, padding = 1),
+                    nn.Conv2d(30, 60, kernel_size = 3, stride = 1, padding = 1),
+                    nn.BatchNorm2d(60),
                     nn.ReLU(),
                     nn.MaxPool2d(kernel_size = 2, stride = 2),
-
+ 
                     nn.Flatten(),
 
-                    # Note: To find out the in_features, comment out everything after the nn.Flatten() and find the shape of the output of nn.MaxPool2d
-                    # The last 3 numbers of the shape should be the in_features for the first linear layer
-                    nn.Linear(32 * 25 * 25, 128), 
+                    nn.Linear(60 * 25 * 25, 7500),
+                    nn.BatchNorm1d(7500),
                     nn.ReLU(),
-                    nn.Linear(128, 5) # 5 types of rice
+
+                    nn.Linear(7500, 1500),
+                    nn.BatchNorm1d(1500),
+                    nn.ReLU(),
+
+                    nn.Linear(1500, 5)
 
                     )
 
@@ -367,3 +390,37 @@ plt.show()
 # TestLoss: 0.3905371427536011
 # AvgValAccuracy: 89.80329132080078
 # Correct predictions: 13630 / 15000 | Accuracy(%): 90.86666666666666
+
+
+# --------------------------------------------------------------------
+# Set-up 3:
+
+# ----------------------------------
+# (20 batch-size)
+# 20000 steps + Kai-Ming initialised
+
+# TrainLoss: 0.0001246255123987794
+# ValLoss: 0.0008903587586246431
+# TestLoss: 0.0010815162677317858
+# AvgValAccuracy: 96.1512451171875
+# Correct predictions: 14922 / 15000 | Accuracy(%): 99.48
+
+# ----------------------------------
+# (32 batch-size)
+# 20000 steps + Kai-Ming initialised
+
+# TrainLoss: 8.250022801803425e-05
+# ValLoss: 4.983106555300765e-05
+# TestLoss: 0.000184959004400298
+# AvgValAccuracy: 97.0484390258789
+# Correct predictions: 14921 / 15000 | Accuracy(%): 99.47333333333333
+
+# ----------------------------------
+# (50 batch-size)
+# 20000 steps + Kai-Ming initialised
+
+# TrainLoss: 6.487225164164556e-06
+# ValLoss: 8.530884952051565e-05
+# TestLoss: 4.414386785356328e-05
+# AvgValAccuracy: 97.43045806884766
+# Correct predictions: 14849 / 15000 | Accuracy(%): 98.99333333333334
