@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 
 torch.manual_seed(2000)
 
-batch_size = 32
+batch_size = 20
 image_folders = os.listdir("Dataset/Images")
 device = "cuda" if torch.cuda.is_available else "cpu"
 print(f"Device: {device}")
@@ -263,7 +263,8 @@ model = nn.Sequential(
                     nn.Linear(7500, 1500),
                     nn.BatchNorm1d(1500),
                     nn.ReLU(),
-
+                    
+                    nn.Dropout1d(p = 0.1, inplace = False), # "inplace = False" because "inplace = True" modifies the inputs without making a copy tensor (but we need the original when calling loss.backward())
                     nn.Linear(1500, 5)
 
                     )
@@ -397,13 +398,27 @@ plt.show()
 
 # ----------------------------------
 # (20 batch-size)
-# 20000 steps + Kai-Ming initialised
 
+# 20000 steps + Kai-Ming initialised
 # TrainLoss: 0.0001246255123987794
 # ValLoss: 0.0008903587586246431
 # TestLoss: 0.0010815162677317858
 # AvgValAccuracy: 96.1512451171875
 # Correct predictions: 14922 / 15000 | Accuracy(%): 99.48
+
+# 20000 steps + Kai-Ming initialised + dropout(p = 0.2)
+# TrainLoss: 0.008496998809278011
+# ValLoss: 0.003705524606630206
+# TestLoss: 0.04365408793091774
+# AvgValAccuracy: 94.66624450683594
+# Correct predictions: 14843 / 15000 | Accuracy(%): 98.95333333333333
+
+# 20000 steps + Kai-Ming initialised + dropout(p = 0.1)
+# TrainLoss: 0.0004942810628563166
+# ValLoss: 0.00016148066788446158
+# TestLoss: 0.00033487920882180333
+# AvgValAccuracy: 95.13812255859375
+# Correct predictions: 14869 / 15000 | Accuracy(%): 99.12666666666667
 
 # ----------------------------------
 # (32 batch-size)
