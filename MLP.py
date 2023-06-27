@@ -7,12 +7,13 @@ import matplotlib.pyplot as plt
 
 torch.manual_seed(2000)
 
-batch_size = 50 # 20, 16
+batch_size = 50 # 20 # 16
 image_folders = os.listdir("Dataset/Images")
 device = "cuda" if torch.cuda.is_available else "cpu"
 print(f"Device: {device}")
-image_size = (125, 125)
-num_image_pixels = image_size[0] * image_size[1]
+image_size = (100, 100)
+n_colour_channels = 3 # (R, G, B)
+num_image_pixels = image_size[0] * image_size[1] * n_colour_channels
 
 # Splits and distributions for generating batches
 num_types = len(image_folders)
@@ -56,22 +57,19 @@ def img_to_matrix(image_indexes, r_type_indexes, img_size, img_num_pixels):
         img_path = f"Dataset/Images/{img_type}/{img_type} ({str(img_num.item())}).jpg" # E.g. Dataset/Images/Jasmine/Jasmine (3).jpg"
 
         # Read image into numpy array
-        img = cv2.imread(img_path)
+        img_np = cv2.imread(img_path)
 
         # Scale down image
-        img = cv2.resize(img, img_size)
+        img_np = cv2.resize(img_np, img_size)
 
-        # Convert image to grey
-        grey_img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        # Create PyTorch tensor from numpy array
+        img_pt = torch.from_numpy(img_np).float()
 
-        # Matrix of shape (62500) with each pixel containing the greyscale value
-        pixel_matrix = torch.from_numpy(grey_img).view(img_num_pixels).float()
-        
         # Add to matrices list
-        matrices.append(pixel_matrix)
+        matrices.append(img_pt.view(img_num_pixels))
 
         # Release image memory
-        del img
+        del img_np, img_pt
 
     # Add all the matrices into a single tensor [Shape: (batch_size, pixel_number)]
     matrices = torch.stack(matrices, dim = 0)
@@ -194,28 +192,28 @@ model = nn.Sequential(
 
                     # nn.Linear(2500, 5)
 
-                    # 3
-                    nn.Linear(10000, 7500),
-                    nn.BatchNorm1d(num_features = 7500),
-                    nn.ReLU(),
+                    # # 3
+                    # nn.Linear(10000, 7500),
+                    # nn.BatchNorm1d(num_features = 7500),
+                    # nn.ReLU(),
 
-                    nn.Linear(7500, 5000),
-                    nn.BatchNorm1d(num_features = 5000),
-                    nn.ReLU(),
+                    # nn.Linear(7500, 5000),
+                    # nn.BatchNorm1d(num_features = 5000),
+                    # nn.ReLU(),
 
-                    nn.Linear(5000, 2500),
-                    nn.BatchNorm1d(num_features = 2500),
-                    nn.ReLU(),
+                    # nn.Linear(5000, 2500),
+                    # nn.BatchNorm1d(num_features = 2500),
+                    # nn.ReLU(),
 
-                    nn.Linear(2500, 1250),
-                    nn.BatchNorm1d(num_features = 1250),
-                    nn.ReLU(),
+                    # nn.Linear(2500, 1250),
+                    # nn.BatchNorm1d(num_features = 1250),
+                    # nn.ReLU(),
 
-                    nn.Linear(1250, 625),
-                    nn.BatchNorm1d(num_features = 625),
-                    nn.ReLU(),
+                    # nn.Linear(1250, 625),
+                    # nn.BatchNorm1d(num_features = 625),
+                    # nn.ReLU(),
 
-                    nn.Linear(625, 5)
+                    # nn.Linear(625, 5)
 
                     # # 4 (125 x 125) image size
                     # nn.Linear(num_image_pixels, 10000),
@@ -244,20 +242,46 @@ model = nn.Sequential(
 
                     # nn.Linear(625, 5)
 
+                    # 5 (Adapted set-up 3 to work with 3 colour channels) [Cannot add nn.Linear(30000, 10000) instead due to OutOfMemory error]
+                    nn.Linear(30000, 7500),
+                    nn.BatchNorm1d(num_features = 7500),
+                    nn.ReLU(),
+
+                    nn.Linear(7500, 5000),
+                    nn.BatchNorm1d(num_features = 5000),
+                    nn.ReLU(),
+
+                    nn.Linear(5000, 2500),
+                    nn.BatchNorm1d(num_features = 2500),
+                    nn.ReLU(),
+
+                    nn.Linear(2500, 1250),
+                    nn.BatchNorm1d(num_features = 1250),
+                    nn.ReLU(),
+
+                    nn.Linear(1250, 625),
+                    nn.BatchNorm1d(num_features = 625),
+                    nn.ReLU(),
+
+                    nn.Linear(625, 5)
+
                     )
 model.to(device = device)
 
-# Kai-ming initialisation
-for layer in model:
-    if isinstance(layer, nn.Linear):
-        torch.nn.init.kaiming_normal_(layer.weight, mode = "fan_in", nonlinearity = "relu")
-        # print(layer.weight.std(), layer.weight.mean())
+# Initialisation
+with torch.no_grad():
 
-        # 2nd method:
-        # fan_in = layer.weight.size(1)
-        # std = torch.sqrt(torch.tensor(2.0 / fan_in))
-        # nn.init.normal(layer.weight, mean = 0, std = std)
-        # print(layer.weight.std(), layer.weight.mean())
+    # Kai-ming initialisation
+    for layer in model:
+        if isinstance(layer, nn.Linear):
+            torch.nn.init.kaiming_normal_(layer.weight, mode = "fan_in", nonlinearity = "relu")
+            # print(layer.weight.std(), layer.weight.mean())
+
+            # 2nd method:
+            # fan_in = layer.weight.size(1)
+            # std = torch.sqrt(torch.tensor(2.0 / fan_in))
+            # nn.init.normal(layer.weight, mean = 0, std = std)
+            # print(layer.weight.std(), layer.weight.mean())
 
 
 # Optimisers
@@ -370,3 +394,25 @@ plt.show()
 # TestLoss: 0.6086336374282837
 # AvgValAccuracy: 88.6610107421875
 # Correct predictions: 13526 / 15000 | Accuracy(%): 90.17333221435547
+
+# --------------------------------------------------------
+# 4th set-up for model: [(100, 100) image size]
+
+# (20 batch size) 
+# 20000 steps + Kai-Ming initialised
+
+# TrainLoss: 0.004270065575838089
+# ValLoss: 0.22270695865154266
+# TestLoss: 0.2747001349925995
+# AvgValAccuracy: 89.0668716430664
+# Correct predictions: 13447 / 15000 | Accuracy(%): 89.64666748046875
+
+# ----------------------------------
+# (50 batch size) 
+# 20000 steps + Kai-Ming initialised
+
+# TrainLoss: 0.003974916413426399
+# ValLoss: 0.07606350630521774
+# TestLoss: 0.21054767072200775
+# AvgValAccuracy: 92.39400482177734
+# Correct predictions: 14403 / 15000 | Accuracy(%): 96.02000427246094
